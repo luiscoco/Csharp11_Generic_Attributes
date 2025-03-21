@@ -230,3 +230,161 @@ c) Type parameters must be explicitly defined and fully constructed.
 d) Certain types requiring extra metadata (like dynamic, nullable references, or tuples) aren’t allowed.
 
 e) This feature simplifies code readability and helps you write cleaner, safer attributes.
+
+## 5. Generic Attributes sample in C# 11
+
+**Step 1: Create the Generic Attribute**
+
+```csharp
+using System;
+
+public class ValidatorAttribute<TValidator> : Attribute where TValidator : IValidator, new()
+{
+    public IValidator Validator { get; } = new TValidator();
+}
+
+public interface IValidator
+{
+    bool Validate(object value);
+}
+```
+
+This attribute will associate a validator class (IValidator) with a property or method using generics.
+
+**Step 2: Define Some Validators**
+
+Create simple validator classes:
+
+```csharp
+public class StringNotEmptyValidator : IValidator
+{
+    public bool Validate(object value)
+    {
+        return value is string str && !string.IsNullOrWhiteSpace(str);
+    }
+}
+
+public class PositiveNumberValidator : IValidator
+{
+    public bool Validate(object value)
+    {
+        return value is int number && number > 0;
+    }
+}
+```
+
+These validators implement custom validation logic.
+
+**Step 3: Use the Generic Attribute in a Class**
+
+```csharp
+public class Person
+{
+    [Validator<StringNotEmptyValidator>]
+    public string Name { get; set; }
+
+    [Validator<PositiveNumberValidator>]
+    public int Age { get; set; }
+}
+```
+
+With this setup, properties clearly indicate which validators apply.
+
+**Step 4: Use Reflection to Perform Validation**
+
+Here's a practical demonstration in your Program.cs file:
+
+```csharp
+using System;
+using System.Reflection;
+
+class Program
+{
+    static void Main()
+    {
+        var person = new Person { Name = "Alice", Age = 30 };
+        var invalidPerson = new Person { Name = "", Age = -5 };
+
+        Console.WriteLine("Validating a valid person...");
+        ValidateObject(person);
+
+        Console.WriteLine("\nValidating an invalid person...");
+        ValidateObject(invalidPerson);
+    }
+
+    static void ValidateObject(object obj)
+    {
+        var properties = obj.GetType().GetProperties();
+
+        foreach (var prop in properties)
+        {
+            var validatorAttr = prop.GetCustomAttribute(typeof(ValidatorAttribute<>), inherit: false);
+            if (validatorAttr != null)
+            {
+                dynamic validatorInstance = ((dynamic)validatorAttr).Validator;
+                var propValue = prop.GetValue(obj);
+
+                bool isValid = validatorInstance.Validate(propValue);
+                Console.WriteLine($"Property '{prop.Name}' with value '{propValue}': {(isValid ? "Valid ✅" : "Invalid ❌")}");
+            }
+        }
+    }
+}
+```
+
+**Important Note**: The reflection used above (GetCustomAttribute) doesn't support open generic types directly (ValidatorAttribute<>). 
+
+Instead, you should use a slightly modified version of the validation method as follows:
+
+**Corrected Reflection (fully working version)**:
+
+```csharp
+static void ValidateObject(object obj)
+{
+    var properties = obj.GetType().GetProperties();
+
+    foreach (var prop in properties)
+    {
+        var attributes = prop.GetCustomAttributes();
+
+        foreach (var attr in attributes)
+        {
+            var attrType = attr.GetType();
+            if (attrType.IsGenericType && attrType.GetGenericTypeDefinition() == typeof(ValidatorAttribute<>))
+            {
+                dynamic validatorInstance = ((dynamic)attr).Validator;
+                var propValue = prop.GetValue(obj);
+
+                bool isValid = validatorInstance.Validate(propValue);
+                Console.WriteLine($"Property '{prop.Name}' with value '{propValue}': {(isValid ? "Valid ✅" : "Invalid ❌")}");
+            }
+        }
+    }
+}
+```
+
+This reflection approach correctly finds and applies generic attributes.
+
+**Output**:
+
+Running the console app produces:
+
+```
+Validating a valid person...
+Property 'Name' with value 'Alice': Valid ✅
+Property 'Age' with value '30': Valid ✅
+```
+
+```
+Validating an invalid person...
+Property 'Name' with value '': Invalid ❌
+Property 'Age' with value '-5': Invalid ❌
+```
+
+**Explanation of the Example**:
+
+Generic Attributes allowed the attribute (ValidatorAttribute) to be directly tied to a strongly-typed validator class without explicitly passing the validator instance at runtime.
+
+Reflection is used to access and execute the validators dynamically based on attributes at runtime.
+
+This pattern is practical in scenarios like validation frameworks, serialization, or custom metadata applications.

@@ -126,3 +126,107 @@ We applied it explicitly to methods to describe their expected return types.
 Using reflection, we retrieved the attribute metadata at runtime and verified if the method result matches the declared type in the attribute.
 
 This demonstrates clearly how the pre-C# 11 syntax works practically in real-world C# applications.
+
+## 2. What's new in C# 11?
+
+**C# 11** introduces the concept of **Generic Attributes**, allowing you to use generics directly in your attribute definitions.
+
+Here's how it looks now:
+
+**With C# 11 generic attributes**:
+
+```csharp
+public class GenericAttribute<T> : Attribute { }
+
+// Usage:
+[GenericAttribute<string>()]
+public string Method() => default;
+```
+
+In this improved version:
+
+You don't explicitly pass the type using typeof. Instead, you directly specify it as a generic parameter.
+
+It's clearer, simpler, and less verbose.
+
+Also, note that if the attribute has no constructor parameters, parentheses can be omitted:
+
+```csharp
+[GenericAttribute<string>]
+public string Method() => default;
+```
+
+## 3. Important restrictions:
+
+When using **Generic Attributes**, there are some important rules:
+
+**a. The type parameter must be fully constructed**:
+
+Allowed:
+
+```csharp
+[GenericAttribute<int>]
+public void AllowedMethod() { }
+```
+
+Not allowed (generic type parameter isn't specified):
+
+```csharp
+public class GenericType<T>
+{
+   [GenericAttribute<T>] // ❌ Error! T must be fully specified.
+   public void InvalidMethod() { }
+}
+```
+
+You can't use a generic type parameter from the containing class or method. The attribute’s type parameter must always be explicitly set at compile-time.
+
+**b. Types must be representable in metadata**:
+
+Certain types that carry extra metadata annotations aren't allowed because they can't be represented directly. For example, you can't use:
+
+a) dynamic
+
+b) nullable reference types (e.g., string?)
+
+c) tuple types (e.g., (int X, int Y))
+
+Instead, you should use their base metadata representations:
+
+![image](https://github.com/user-attachments/assets/ce1c15f1-9140-46c5-9f7f-88f00533d27b)
+
+Example:
+
+Not Allowed:
+
+```csharp
+[GenericAttribute<dynamic>] 
+public void Method() { }
+```
+
+Allowed:
+
+```csharp
+[GenericAttribute<object>] 
+public void Method() { }
+```
+
+## 4. Benefits of Generic Attributes:
+
+**Cleaner code**: More readable and concise attribute usage.
+
+**Better type-safety**: Reduces possible mistakes made with typeof.
+
+**Improved readability**: Clearer intent in the code.
+
+**Quick summary**:
+
+a) C# 11 now supports creating generic attributes directly.
+
+b) Attributes can directly take a type parameter, eliminating the verbose typeof(Type) syntax.
+
+c) Type parameters must be explicitly defined and fully constructed.
+
+d) Certain types requiring extra metadata (like dynamic, nullable references, or tuples) aren’t allowed.
+
+e) This feature simplifies code readability and helps you write cleaner, safer attributes.
